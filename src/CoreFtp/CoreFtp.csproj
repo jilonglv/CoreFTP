@@ -13,8 +13,8 @@
       net40 ssl not test;
     </Description>
     <Copyright>jilonglv 2020</Copyright>
-    <AssemblyTitle>Netcore.Ftp</AssemblyTitle>
-    <VersionPrefix>1.3.4</VersionPrefix>
+    <AssemblyTitle>XCore.Ftp</AssemblyTitle>
+    <VersionPrefix>1.3.5</VersionPrefix>
     <Authors>jilonglv</Authors>
     <AssemblyName>XCore.Ftp</AssemblyName>
     <PackageId>XCore.Ftp</PackageId>

@@ -12,20 +12,21 @@
 
     public class DnsResolver : IDnsResolver
     {
+        InMemoryCache cache;
         public DnsResolver()
         {
-            //cache = new InMemoryCache();
+            cache = new InMemoryCache();
         }
 
         public async Task<IPEndPoint> ResolveAsync( string endpoint, int port, IpVersion ipVersion = IpVersion.IpV4, CancellationToken token = default( CancellationToken ) )
         {
             string cacheKey = $"{endpoint}:{port}:{ipVersion}";
 
-            //if ( port < IPEndPoint.MinPort || port > IPEndPoint.MaxPort )
-            //    throw new ArgumentOutOfRangeException( nameof( port ) );
+            if (port < IPEndPoint.MinPort || port > IPEndPoint.MaxPort)
+                throw new ArgumentOutOfRangeException(nameof(port));
 
-            //if ( cache.HasKey( cacheKey ) )
-            //    return cache.Get<IPEndPoint>( cacheKey );
+            if (cache.HasKey(cacheKey))
+                return cache.Get<IPEndPoint>(cacheKey);
 
             var addressFamily = ipVersion.HasFlag( IpVersion.IpV4 )
                 ? AddressFamily.InterNetwork
@@ -41,7 +42,7 @@
             if ( ipAddress != null )
             {
                 ipEndpoint = new IPEndPoint( ipAddress, port );
-                //cache.Add( cacheKey, ipEndpoint, TimeSpan.FromMinutes( 60 ) );
+                cache.Add(cacheKey, ipEndpoint, TimeSpan.FromMinutes(60));
                 return ipEndpoint;
             }
 
@@ -57,7 +58,7 @@
                 if ( firstAddressInFamily != null )
                 {
                     ipEndpoint = new IPEndPoint( firstAddressInFamily, port );
-                   // cache.Add( cacheKey, ipEndpoint, TimeSpan.FromMinutes( 60 ) );
+                    cache.Add(cacheKey, ipEndpoint, TimeSpan.FromMinutes(60));
                     return ipEndpoint;
                 }
 
@@ -68,7 +69,7 @@
 
                     if ( ipEndpoint != null )
                     {
-                        //cache.Add( cacheKey, ipEndpoint, TimeSpan.FromMinutes( 60 ) );
+                        cache.Add(cacheKey, ipEndpoint, TimeSpan.FromMinutes(60));
                         return ipEndpoint;
                     }
                 }
@@ -98,7 +99,7 @@
                         return null;
                 }
 
-                //cache.Add( cacheKey, ipEndpoint, TimeSpan.FromMinutes( 60 ) );
+                cache.Add(cacheKey, ipEndpoint, TimeSpan.FromMinutes(60));
 
                 return ipEndpoint;
             }
