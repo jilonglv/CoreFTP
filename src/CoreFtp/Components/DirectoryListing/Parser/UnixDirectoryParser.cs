@@ -8,7 +8,6 @@ namespace CoreFtp.Components.DirectoryListing.Parser
     using System.Text.RegularExpressions;
     using Enum;
     using Infrastructure;
-    using Microsoft.Extensions.Logging;
 
     public class UnixDirectoryParser : IListDirectoryParser
     {
@@ -32,11 +31,9 @@ namespace CoreFtp.Components.DirectoryListing.Parser
 
         };
 
-        private ILogger logger;
 
-        public UnixDirectoryParser(ILogger logger)
+        public UnixDirectoryParser()
         {
-            this.logger = logger;
         }
 
         public bool Test( string testString )

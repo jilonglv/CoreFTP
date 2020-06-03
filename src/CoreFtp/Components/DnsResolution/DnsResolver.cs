@@ -4,6 +4,7 @@
     using System.Linq;
     using System.Net;
     using System.Net.Sockets;
+    using System.Runtime.CompilerServices;
     using System.Threading;
     using System.Threading.Tasks;
     using Enum;
@@ -11,22 +12,20 @@
 
     public class DnsResolver : IDnsResolver
     {
-        private readonly ICache cache;
-
         public DnsResolver()
         {
-            cache = new InMemoryCache();
+            //cache = new InMemoryCache();
         }
 
         public async Task<IPEndPoint> ResolveAsync( string endpoint, int port, IpVersion ipVersion = IpVersion.IpV4, CancellationToken token = default( CancellationToken ) )
         {
             string cacheKey = $"{endpoint}:{port}:{ipVersion}";
 
-            if ( port < IPEndPoint.MinPort || port > IPEndPoint.MaxPort )
-                throw new ArgumentOutOfRangeException( nameof( port ) );
+            //if ( port < IPEndPoint.MinPort || port > IPEndPoint.MaxPort )
+            //    throw new ArgumentOutOfRangeException( nameof( port ) );
 
-            if ( cache.HasKey( cacheKey ) )
-                return cache.Get<IPEndPoint>( cacheKey );
+            //if ( cache.HasKey( cacheKey ) )
+            //    return cache.Get<IPEndPoint>( cacheKey );
 
             var addressFamily = ipVersion.HasFlag( IpVersion.IpV4 )
                 ? AddressFamily.InterNetwork
@@ -42,19 +41,23 @@
             if ( ipAddress != null )
             {
                 ipEndpoint = new IPEndPoint( ipAddress, port );
-                cache.Add( cacheKey, ipEndpoint, TimeSpan.FromMinutes( 60 ) );
+                //cache.Add( cacheKey, ipEndpoint, TimeSpan.FromMinutes( 60 ) );
                 return ipEndpoint;
             }
 
             try
             {
+#if NET40
+                var allAddresses = Dns.GetHostAddresses(endpoint);
+#else
                 var allAddresses = await Dns.GetHostAddressesAsync( endpoint );
+#endif
 
                 var firstAddressInFamily = allAddresses.FirstOrDefault( x => x.AddressFamily == addressFamily );
                 if ( firstAddressInFamily != null )
                 {
                     ipEndpoint = new IPEndPoint( firstAddressInFamily, port );
-                    cache.Add( cacheKey, ipEndpoint, TimeSpan.FromMinutes( 60 ) );
+                   // cache.Add( cacheKey, ipEndpoint, TimeSpan.FromMinutes( 60 ) );
                     return ipEndpoint;
                 }
 
@@ -65,7 +68,7 @@
 
                     if ( ipEndpoint != null )
                     {
-                        cache.Add( cacheKey, ipEndpoint, TimeSpan.FromMinutes( 60 ) );
+                        //cache.Add( cacheKey, ipEndpoint, TimeSpan.FromMinutes( 60 ) );
                         return ipEndpoint;
                     }
                 }
@@ -77,17 +80,25 @@
                 switch ( firstAddress.AddressFamily )
                 {
                     case AddressFamily.InterNetwork:
-                        ipEndpoint = new IPEndPoint( firstAddress.MapToIPv6(), port );
+#if NET40
+                        ipEndpoint = new IPEndPoint(firstAddress, port);
+#else
+                        ipEndpoint = new IPEndPoint(firstAddress.MapToIPv6(), port);
+#endif
                         break;
 
                     case AddressFamily.InterNetworkV6:
-                        ipEndpoint = new IPEndPoint( firstAddress.MapToIPv4(), port );
+#if NET40
+                        ipEndpoint = new IPEndPoint(firstAddress, port);
+#else
+                        ipEndpoint = new IPEndPoint(firstAddress.MapToIPv4(), port);
+#endif
                         break;
                     default:
                         return null;
                 }
 
-                cache.Add( cacheKey, ipEndpoint, TimeSpan.FromMinutes( 60 ) );
+                //cache.Add( cacheKey, ipEndpoint, TimeSpan.FromMinutes( 60 ) );
 
                 return ipEndpoint;
             }

@@ -5,17 +5,14 @@
     using Enum;
     using Infrastructure;
     using Infrastructure.Extensions;
-    using Microsoft.Extensions.Logging;
 
     public class DosDirectoryParser : IListDirectoryParser
     {
         private readonly Regex dosDirectoryRegex = new Regex( @"(?<modify>\d+-\d+-\d+\s+\d+:\d+\w+)\s+<DIR>\s+(?<name>.*)$", RegexOptions.Compiled );
         private readonly Regex dosFileRegex = new Regex( @"(?<modify>\d+-\d+-\d+\s+\d+:\d+\w+)\s+(?<size>\d+)\s+(?<name>.*)$", RegexOptions.Compiled );
-        private ILogger logger;
 
-        public DosDirectoryParser( ILogger logger )
+        public DosDirectoryParser()
         {
-            this.logger = logger;
         }
 
         public bool Test( string testString )

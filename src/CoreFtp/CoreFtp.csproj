@@ -1,29 +1,34 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <Description>A simple .NET FTP library written entirely in C#, with no external dependencies</Description>
-    <Copyright>Nick Briscoe 2016</Copyright>
-    <AssemblyTitle>CoreFTP</AssemblyTitle>
+    <!--<TargetFramework>netcoreapp2.2</TargetFramework>-->
+    <!-- <TargetFrameworks>netcoreapp2.0;netcoreapp2.1;netcoreapp2.2;netcoreapp3.0;net45;net451;net452;net46;net461</TargetFrameworks> -->
+    <TargetFrameworks>netstandard1.6;net40</TargetFrameworks>
+
+    <Description>
+      A simple .NET FTP library written entirely in C#, with no external dependencies
+      forked from sparkeh9/CoreFTP
+      netstandard1.6+;net40+;
+      support port mode;
+      net40 ssl not test;
+    </Description>
+    <Copyright>jilonglv 2020</Copyright>
+    <AssemblyTitle>Netcore.Ftp</AssemblyTitle>
     <VersionPrefix>1.3.4</VersionPrefix>
-    <Authors>Nick Briscoe</Authors>
-    <TargetFrameworks>netstandard1.6;net452</TargetFrameworks>
-    <AssemblyName>CoreFtp</AssemblyName>
-    <PackageId>CoreFtp</PackageId>
+    <Authors>jilonglv</Authors>
+    <AssemblyName>XCore.Ftp</AssemblyName>
+    <PackageId>XCore.Ftp</PackageId>
     <PackageTags>ftp;core;vnext</PackageTags>
-    <PackageProjectUrl>https://github.com/sparkeh9/CoreFTP</PackageProjectUrl>
-    <PackageTargetFallback Condition=" '$(TargetFramework)' == 'netstandard1.6' ">$(PackageTargetFallback);dnxcore50</PackageTargetFallback>
-    <NetStandardImplicitPackageVersion Condition=" '$(TargetFramework)' == 'netstandard1.6' ">1.6.0</NetStandardImplicitPackageVersion>
-    <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
-    <GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
-    <GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
-    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-    <Version>1.4</Version>
+    <PackageProjectUrl>https://github.com/jilonglv/CoreFTP</PackageProjectUrl>
   </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="1.0.2" />
-    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="1.0.2" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="1.0.2" />
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net40' ">
+    <PackageReference Include="Microsoft.Bcl" Version="1.1.9" />
+    <PackageReference Include="Microsoft.Bcl.Async" Version="1.0.168" />
+    <PackageReference Include="Microsoft.Bcl.Build" Version="1.0.14" />
+
+    <PackageReference Include="CacheManager.Core" Version="1.2.0" />
+    <PackageReference Include="CacheManager.SystemRuntimeCaching" Version="1.2.0" />
   </ItemGroup>
 
   <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard1.6' ">
@@ -31,18 +36,8 @@
     <PackageReference Include="System.Reflection.TypeExtensions" Version="4.4.0" />
     <PackageReference Include="System.Threading.Tasks" Version="4.3.0" />
     <PackageReference Include="System.Net.Security" Version="4.3.1" />
-  </ItemGroup>
 
-  <PropertyGroup Condition=" '$(TargetFramework)' == 'netstandard1.6' ">
-    <DefineConstants>$(DefineConstants);NETSTANDARD</DefineConstants>
-  </PropertyGroup>
-
-  <Target Name="PostcompileScript" AfterTargets="Build" Condition=" '$(IsCrossTargetingBuild)' != 'true' ">
-  </Target>
-
-  <ItemGroup Condition=" '$(TargetFramework)' == 'net452' ">
-    <Reference Include="System" />
-    <Reference Include="Microsoft.CSharp" />
-  </ItemGroup>
-
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="1.1.2" />
+  </ItemGroup>  
 </Project>
+

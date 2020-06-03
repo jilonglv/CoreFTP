@@ -64,25 +64,40 @@
 
             return FtpNodeType.SymbolicLink;
         }
-
+        static Regex regDirectory = new Regex(@"(type\s*=\s*(?<type>dir)\s*;modify\s*=\s*(?<modify>[^;]+);\s(?<name>(.)+))|(type\s*=\s*(?<type>file)\s*;modify\s*=\s*(?<modify>[^;]+);size\s*=\s*(?<size>(\d)+);\s(?<name>(.)+))",
+             RegexOptions.IgnoreCase | RegexOptions.Compiled| RegexOptions.ExplicitCapture);
         internal static FtpNodeInformation ToFtpNode( this string operand )
         {
-            var dictionary = operand.Split( ';' )
-                                    .Select( s => s.Split( '=' ) )
-                                    .ToDictionary( strings => strings.Length == 2
-                                                       ? strings[ 0 ]
-                                                       : "name",
-                                                   strings => strings.Length == 2
-                                                       ? strings[ 1 ]
-                                                       : strings[ 0 ] );
-
-            return new FtpNodeInformation
+            var match = regDirectory.Match(operand);
+            var dictionary = new System.Collections.Generic.Dictionary<string, string>();
+            if (match.Success)
             {
-                NodeType = dictionary.GetValueOrDefault( "type" ).Trim().ToNodeType(),
-                Name = dictionary.GetValueOrDefault( "name" ).Trim(),
-                Size = dictionary.GetValueOrDefault( "size" ).ParseOrDefault(),
-                DateModified = dictionary.GetValueOrDefault( "modify" ).ParseExactOrDefault( "yyyyMMddHHmmss" )
-            };
+                return new FtpNodeInformation
+                {
+                    NodeType = match.Groups["type"].Value.Trim().ToNodeType(),
+                    Name = match.Groups["name"].Value.Trim(),
+                    Size = match.Groups["size"].Value.ParseOrDefault(),
+                    DateModified = match.Groups["modify"].Value.ParseExactOrDefault("yyyyMMddHHmmss")
+                };
+            }
+            else
+            {
+                dictionary = operand.Split(';')
+                                        .Select(s => s.Split('='))
+                                        .ToDictionary(strings => strings.Length == 2
+                                                          ? strings[0]
+                                                          : "name",
+                                                       strings => strings.Length == 2
+                                                           ? strings[1]
+                                                           : strings[0]);
+                return new FtpNodeInformation
+                {
+                    NodeType = dictionary.GetValueOrDefault("type").Trim().ToNodeType(),
+                    Name = dictionary.GetValueOrDefault("name").Trim(),
+                    Size = dictionary.GetValueOrDefault("size").ParseOrDefault(),
+                    DateModified = dictionary.GetValueOrDefault("modify").ParseExactOrDefault("yyyyMMddHHmmss")
+                };
+            }
         }
     }
 }

@@ -7,13 +7,11 @@ namespace CoreFtp.Components.DirectoryListing
     using System.Text;
     using System.Threading.Tasks;
     using Infrastructure;
-    using Microsoft.Extensions.Logging;
 
     internal abstract class DirectoryProviderBase : IDirectoryProvider
     {
         protected FtpClient ftpClient;
         protected FtpClientConfiguration configuration;
-        protected ILogger logger;
         protected Stream stream;
 
         protected IEnumerable<string> RetrieveDirectoryListing()
@@ -21,7 +19,7 @@ namespace CoreFtp.Components.DirectoryListing
             string line;
             while ( ( line = ReadLine( ftpClient.ControlStream.Encoding ) ) != null )
             {
-                logger?.LogDebug( line );
+                LoggerHelper.Trace( line );
                 yield return line;
             }
         }
@@ -47,17 +45,17 @@ namespace CoreFtp.Components.DirectoryListing
             return line;
         }
 
-        public virtual Task<ReadOnlyCollection<FtpNodeInformation>> ListAllAsync()
+        public virtual Task<IEnumerable<FtpNodeInformation>> ListAllAsync()
         {
             throw new NotImplementedException();
         }
 
-        public virtual Task<ReadOnlyCollection<FtpNodeInformation>> ListFilesAsync()
+        public virtual Task<IEnumerable<FtpNodeInformation>> ListFilesAsync()
         {
             throw new NotImplementedException();
         }
 
-        public virtual Task<ReadOnlyCollection<FtpNodeInformation>> ListDirectoriesAsync()
+        public virtual Task<IEnumerable<FtpNodeInformation>> ListDirectoriesAsync()
         {
             throw new NotImplementedException();
         }

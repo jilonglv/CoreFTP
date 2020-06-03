@@ -6,15 +6,14 @@
     using Infrastructure;
     using System.Linq;
     using Infrastructure.Extensions;
-    using Microsoft.Extensions.Logging;
+    using System.Collections.Generic;
 
     internal class MlsdDirectoryProvider : DirectoryProviderBase
     {
-        public MlsdDirectoryProvider( FtpClient ftpClient, ILogger logger, FtpClientConfiguration configuration )
+        public MlsdDirectoryProvider( FtpClient ftpClient, FtpClientConfiguration configuration )
         {
             this.ftpClient = ftpClient;
             this.configuration = configuration;
-            this.logger = logger;
         }
 
         private void EnsureLoggedIn()
@@ -23,11 +22,15 @@
                 throw new FtpException( "User must be logged in" );
         }
 
-        public override async Task<ReadOnlyCollection<FtpNodeInformation>> ListAllAsync()
+        public override async Task<IEnumerable<FtpNodeInformation>> ListAllAsync()
         {
             try
             {
+#if NET40
+                await Task.Factory.StartNew(() =>ftpClient.dataSocketSemaphore.Wait());
+#else
                 await ftpClient.dataSocketSemaphore.WaitAsync();
+#endif
                 return await ListNodeTypeAsync();
             }
             finally
@@ -36,11 +39,16 @@
             }
         }
 
-        public override async Task<ReadOnlyCollection<FtpNodeInformation>> ListFilesAsync()
+        public override async Task<IEnumerable<FtpNodeInformation>> ListFilesAsync()
         {
             try
             {
+#if NET40
+
+                await Task.Factory.StartNew(() => ftpClient.dataSocketSemaphore.Wait());
+#else
                 await ftpClient.dataSocketSemaphore.WaitAsync();
+#endif
                 return await ListNodeTypeAsync( FtpNodeType.File );
             }
             finally
@@ -49,11 +57,16 @@
             }
         }
 
-        public override async Task<ReadOnlyCollection<FtpNodeInformation>> ListDirectoriesAsync()
+        public override async Task<IEnumerable<FtpNodeInformation>> ListDirectoriesAsync()
         {
             try
             {
+#if NET40
+
+                await Task.Factory.StartNew(() => ftpClient.dataSocketSemaphore.Wait());
+#else
                 await ftpClient.dataSocketSemaphore.WaitAsync();
+#endif
                 return await ListNodeTypeAsync( FtpNodeType.Directory );
             }
             finally
@@ -67,7 +80,7 @@
         /// </summary>
         /// <param name="ftpNodeType"></param>
         /// <returns></returns>
-        private async Task<ReadOnlyCollection<FtpNodeInformation>> ListNodeTypeAsync( FtpNodeType? ftpNodeType = null )
+        private async Task<IEnumerable<FtpNodeInformation>> ListNodeTypeAsync( FtpNodeType? ftpNodeType = null )
         {
             string nodeTypeString = !ftpNodeType.HasValue
                 ? "all"
@@ -75,7 +88,7 @@
                     ? "file"
                     : "dir";
 
-            logger?.LogDebug( $"[MlsdDirectoryProvider] Listing {ftpNodeType}" );
+            LoggerHelper.Debug( $"[MlsdDirectoryProvider] Listing {ftpNodeType}" );
 
             EnsureLoggedIn();
 

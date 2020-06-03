@@ -1,6 +1,6 @@
 ﻿namespace CoreFtp.Components.DirectoryListing
 {
-    using System.Collections.ObjectModel;
+    using System.Collections.Generic;
     using System.Threading.Tasks;
     using Infrastructure;
 
@@ -10,18 +10,18 @@
         /// Lists all nodes in the current working directory
         /// </summary>
         /// <returns></returns>
-        Task<ReadOnlyCollection<FtpNodeInformation>> ListAllAsync();
+        Task<IEnumerable<FtpNodeInformation>> ListAllAsync();
 
         /// <summary>
         /// Lists all files in the current working directory
         /// </summary>
         /// <returns></returns>
-        Task<ReadOnlyCollection<FtpNodeInformation>> ListFilesAsync();
+        Task<IEnumerable<FtpNodeInformation>> ListFilesAsync();
 
         /// <summary>
         /// Lists directories beneath the current working directory
         /// </summary>
         /// <returns></returns>
-        Task<ReadOnlyCollection<FtpNodeInformation>> ListDirectoriesAsync();
+        Task<IEnumerable<FtpNodeInformation>> ListDirectoriesAsync();
     }
 }

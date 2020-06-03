@@ -25,6 +25,7 @@
         TYPE,
         FEAT,
         PBSZ,
-        PROT
+        PROT,//?
+        PORT
     }
 }

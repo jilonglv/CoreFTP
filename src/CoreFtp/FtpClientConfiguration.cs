@@ -11,6 +11,7 @@
         public int? DisconnectTimeoutMilliseconds { get; set; } = 100;
         public int Port { get; set; } = Constants.FtpPort;
         public string Host { get; set; }
+        public bool UsePassive { get; set; } = true;
         public IpVersion IpVersion { get; set; } = IpVersion.IpV4;
         public FtpEncryption EncryptionType { get; set; } = FtpEncryption.None;
         public bool IgnoreCertificateErrors { get; set; } = true;
@@ -25,6 +26,10 @@
                                      Port == Constants.FtpsPort;
 
         public X509CertificateCollection ClientCertificates { get; set; } = new X509CertificateCollection();
-        public SslProtocols SslProtocols { get; set; } = SslProtocols.Tls | SslProtocols.Tls11 | SslProtocols.Tls12;
+        public SslProtocols SslProtocols { get; set; } = SslProtocols.Tls
+#if !NET40
+            | SslProtocols.Tls11 | SslProtocols.Tls12
+#endif
+            ;
     }
 }

@@ -1,21 +1,20 @@
 ﻿namespace CoreFtp
 {
     using System;
+    using System.Collections.Generic;
     using System.Collections.ObjectModel;
     using System.IO;
     using System.Threading;
     using System.Threading.Tasks;
     using Enum;
     using Infrastructure;
-    using Microsoft.Extensions.Logging;
 
     public interface IFtpClient : IDisposable
     {
-        ILogger Logger { set; }
-
         bool IsConnected { get;  }
 
         bool IsEncrypted { get; }
+        bool IsLogined { get; }
 
         bool IsAuthenticated { get; }
 
@@ -43,11 +42,11 @@
 
         Task CloseFileDataStreamAsync(CancellationToken ctsToken = default(CancellationToken));
 
-        Task<ReadOnlyCollection<FtpNodeInformation>> ListAllAsync();
+        Task<IEnumerable<FtpNodeInformation>> ListAllAsync();
 
-        Task<ReadOnlyCollection<FtpNodeInformation>> ListFilesAsync();
+        Task<IEnumerable<FtpNodeInformation>> ListFilesAsync();
 
-        Task<ReadOnlyCollection<FtpNodeInformation>> ListDirectoriesAsync();
+        Task<IEnumerable<FtpNodeInformation>> ListDirectoriesAsync();
 
         Task DeleteFileAsync(string fileName);
 

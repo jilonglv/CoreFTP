@@ -14,12 +14,10 @@
     using Components.DnsResolution;
     using Enum;
     using Extensions;
-    using Microsoft.Extensions.Logging;
 
     public class FtpControlStream : Stream
     {
         protected readonly FtpClientConfiguration Configuration;
-        public ILogger Logger;
         protected readonly IDnsResolver dnsResolver;
         protected Socket Socket;
         protected Stream BaseStream;
@@ -29,13 +27,19 @@
         protected int SocketPollInterval { get; } = 15000;
         protected DateTime LastActivity = DateTime.Now;
         public Encoding Encoding { get; set; } = Encoding.ASCII;
-
-        protected readonly SemaphoreSlim semaphore = new SemaphoreSlim( 1, 1 );
-        protected readonly SemaphoreSlim receiveSemaphore = new SemaphoreSlim( 1, 1 );
+        public System.Net.EndPoint LocalEndPoint
+        {
+            get
+            {
+                return Socket?.LocalEndPoint;
+            }
+        }
+        protected readonly SemaphoreSlim semaphore = new SemaphoreSlim(1, 1);
+        protected readonly SemaphoreSlim receiveSemaphore = new SemaphoreSlim(1, 1);
 
         internal bool IsDataConnection { get; set; }
 
-        internal void SetTimeouts( int milliseconds )
+        internal void SetTimeouts(int milliseconds)
         {
             BaseStream.ReadTimeout = milliseconds;
             BaseStream.WriteTimeout = milliseconds;
@@ -47,9 +51,9 @@
             BaseStream.WriteTimeout = Configuration.TimeoutSeconds * 1000;
         }
 
-        public FtpControlStream( FtpClientConfiguration configuration, IDnsResolver dnsResolver )
+        public FtpControlStream(FtpClientConfiguration configuration, IDnsResolver dnsResolver)
         {
-            Logger?.LogDebug( "Constructing new FtpSocketStream" );
+            LoggerHelper.Debug("Constructing new FtpSocketStream");
             Configuration = configuration;
             this.dnsResolver = dnsResolver;
         }
@@ -73,32 +77,32 @@
             {
                 try
                 {
-                    if ( Socket == null || !Socket.Connected || ( !CanRead || !CanWrite ) )
+                    if (Socket == null || !Socket.Connected || (!CanRead || !CanWrite))
                     {
                         Disconnect();
                         return false;
                     }
 
-                    if ( LastActivity.HasIntervalExpired( DateTime.Now, SocketPollInterval ) )
+                    if (LastActivity.HasIntervalExpired(DateTime.Now, SocketPollInterval))
                     {
-                        Logger?.LogDebug( "Polling connection" );
-                        if ( Socket.Poll( 500000, SelectMode.SelectRead ) && Socket.Available == 0 )
+                        LoggerHelper.Debug("Polling connection");
+                        if (Socket.Poll(500000, SelectMode.SelectRead) && Socket.Available == 0)
                         {
                             Disconnect();
                             return false;
                         }
                     }
                 }
-                catch ( SocketException socketException )
+                catch (SocketException socketException)
                 {
                     Disconnect();
-                    Logger?.LogError( $"FtpSocketStream.IsConnected: Caught and discarded SocketException while testing for connectivity: {socketException}" );
+                    LoggerHelper.Error($"FtpSocketStream.IsConnected: Caught and discarded SocketException while testing for connectivity: {socketException}");
                     return false;
                 }
-                catch ( IOException ioException )
+                catch (IOException ioException)
                 {
                     Disconnect();
-                    Logger?.LogError( $"FtpSocketStream.IsConnected: Caught and discarded IOException while testing for connectivity: {ioException}" );
+                    LoggerHelper.Error($"FtpSocketStream.IsConnected: Caught and discarded IOException while testing for connectivity: {ioException}");
                     return false;
                 }
 
@@ -106,23 +110,27 @@
             }
         }
 
-        public override int Read( byte[] buffer, int offset, int count )
+        public override int Read(byte[] buffer, int offset, int count)
         {
-            return NetworkStream?.Read( buffer, offset, count ) ?? 0;
+            return NetworkStream?.Read(buffer, offset, count) ?? 0;
         }
 
 
-        public override void Write( byte[] buffer, int offset, int count )
+        public override void Write(byte[] buffer, int offset, int count)
         {
-            NetworkStream?.Write( buffer, offset, count );
+            NetworkStream?.Write(buffer, offset, count);
         }
 
-        public override async Task WriteAsync( byte[] buffer, int offset, int count, CancellationToken cancellationToken )
+        public
+#if !NET40
+            override
+#endif
+             async Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
-            await NetworkStream.WriteAsync( buffer, offset, count, cancellationToken );
+            await NetworkStream.WriteAsync(buffer, offset, count, cancellationToken);
         }
 
-        public override long Seek( long offset, SeekOrigin origin )
+        public override long Seek(long offset, SeekOrigin origin)
         {
             throw new InvalidOperationException();
         }
@@ -130,69 +138,69 @@
 
         public override void Flush()
         {
-            if ( !IsConnected )
-                throw new InvalidOperationException( "The FtpSocketStream object is not connected." );
+            if (!IsConnected)
+                throw new InvalidOperationException("The FtpSocketStream object is not connected.");
 
             NetworkStream?.Flush();
         }
 
-        public override void SetLength( long value )
+        public override void SetLength(long value)
         {
             throw new InvalidOperationException();
         }
 
-        public async Task ConnectAsync( CancellationToken token = default( CancellationToken ) )
+        public async Task ConnectAsync(CancellationToken token = default(CancellationToken))
         {
-            await ConnectStreamAsync( token );
+            await ConnectStreamAsync(token);
 
-            if ( !Configuration.ShouldEncrypt )
+            if (!Configuration.ShouldEncrypt)
                 return;
 
-            if ( !IsConnected || IsEncrypted )
+            if (!IsConnected || IsEncrypted)
                 return;
 
-            if ( Configuration.EncryptionType == FtpEncryption.Implicit )
-                await EncryptImplicitly( token );
+            if (Configuration.EncryptionType == FtpEncryption.Implicit)
+                await EncryptImplicitly(token);
 
-            if ( Configuration.EncryptionType == FtpEncryption.Explicit )
-                await EncryptExplicitly( token );
+            if (Configuration.EncryptionType == FtpEncryption.Explicit)
+                await EncryptExplicitly(token);
         }
 
 
-        protected async Task WriteLineAsync( string buf )
+        protected async Task WriteLineAsync(string buf)
         {
-            var data = Encoding.GetBytes( $"{buf}\r\n" );
-            await WriteAsync( data, 0, data.Length, CancellationToken.None );
+            var data = Encoding.GetBytes($"{buf}\r\n");
+            await WriteAsync(data, 0, data.Length, CancellationToken.None);
         }
 
-        protected string ReadLine( Encoding encoding, CancellationToken token )
+        protected string ReadLine(Encoding encoding, CancellationToken token)
         {
-            if ( encoding == null )
-                throw new ArgumentNullException( nameof( encoding ) );
+            if (encoding == null)
+                throw new ArgumentNullException(nameof(encoding));
 
             var data = new List<byte>();
-            var buffer = new byte[ 1 ];
+            var buffer = new byte[1];
             string line = null;
 
             token.ThrowIfCancellationRequested();
 
-            while ( Read( buffer, 0, buffer.Length ) > 0 )
+            while (Read(buffer, 0, buffer.Length) > 0)
             {
                 token.ThrowIfCancellationRequested();
-                data.Add( buffer[ 0 ] );
-                if ( (char) buffer[ 0 ] != '\n' )
+                data.Add(buffer[0]);
+                if ((char)buffer[0] != '\n')
                     continue;
-                line = encoding.GetString( data.ToArray() ).Trim( '\r', '\n' );
+                line = encoding.GetString(data.ToArray()).Trim('\r', '\n');
                 break;
             }
 
             return line;
         }
 
-        private IEnumerable<string> ReadLines( CancellationToken token )
+        private IEnumerable<string> ReadLines(CancellationToken token)
         {
             string line;
-            while ( ( line = ReadLine( Encoding, token ) ) != null )
+            while ((line = ReadLine(Encoding, token)) != null)
             {
                 yield return line;
             }
@@ -201,43 +209,47 @@
 
         public bool SocketDataAvailable()
         {
-            return ( Socket?.Available ?? 0 ) > 0;
+            return (Socket?.Available ?? 0) > 0;
         }
 
-        public async Task<FtpResponse> SendCommandAsync( FtpCommand command, CancellationToken token = default( CancellationToken ) )
+        public async Task<FtpResponse> SendCommandAsync(FtpCommand command, CancellationToken token = default(CancellationToken))
         {
-            return await SendCommandAsync( new FtpCommandEnvelope
+            return await SendCommandAsync(new FtpCommandEnvelope
             {
                 FtpCommand = command
-            }, token );
+            }, token);
         }
 
-        public async Task<FtpResponse> SendCommandAsync( FtpCommandEnvelope envelope, CancellationToken token = default( CancellationToken ) )
+        public async Task<FtpResponse> SendCommandAsync(FtpCommandEnvelope envelope, CancellationToken token = default(CancellationToken))
         {
             string commandString = envelope.GetCommandString();
-            return await SendCommandAsync( commandString, token );
+            return await SendCommandAsync(commandString, token);
         }
 
-        public async Task<FtpResponse> SendCommandAsync( string command, CancellationToken token = default( CancellationToken ) )
+        public async Task<FtpResponse> SendCommandAsync(string command, CancellationToken token = default(CancellationToken))
         {
-            await semaphore.WaitAsync( token );
+#if NET40
+            await Task.Factory.StartNew(() => semaphore.Wait(token));
+#else
+            await semaphore.WaitAsync(token);
+#endif
 
             try
             {
-                if ( SocketDataAvailable() )
+                if (SocketDataAvailable())
                 {
-                    var staleDataResult = await GetResponseAsync( token );
-                    Logger?.LogWarning( $"Stale data on socket {staleDataResult.ResponseMessage}" );
+                    var staleDataResult = await GetResponseAsync(token);
+                    LoggerHelper.Warn($"Stale data on socket {staleDataResult.ResponseMessage}");
                 }
 
-                string commandToPrint = command.StartsWith( FtpCommand.PASS.ToString() )
+                string commandToPrint = command.StartsWith(FtpCommand.PASS.ToString())
                     ? "PASS *****"
                     : command;
 
-                Logger?.LogDebug( $"[FtpClient] Sending command: {commandToPrint}" );
-                await WriteLineAsync( command );
+                LoggerHelper.Debug($"[FtpClient] Sending command: {commandToPrint}");
+                await WriteLineAsync(command);
 
-                var response = await GetResponseAsync( token );
+                var response = await GetResponseAsync(token);
                 return response;
             }
             finally
@@ -246,14 +258,17 @@
             }
         }
 
-        public async Task<FtpResponse> GetResponseAsync( CancellationToken token = default( CancellationToken ) )
+        public async Task<FtpResponse> GetResponseAsync(CancellationToken token = default(CancellationToken))
         {
-            Logger?.LogTrace( "Getting Response" );
+            LoggerHelper.Trace("Getting Response");
 
-            if ( Encoding == null )
-                throw new ArgumentNullException( nameof( Encoding ) );
-
-            await receiveSemaphore.WaitAsync( token );
+            if (Encoding == null)
+                throw new ArgumentNullException(nameof(Encoding));
+#if NET40
+            await Task.Factory.StartNew(() => receiveSemaphore.Wait(token));
+#else
+            await receiveSemaphore.WaitAsync(token);
+#endif
 
             try
             {
@@ -262,19 +277,19 @@
                 var response = new FtpResponse();
                 var data = new List<string>();
 
-                foreach ( string line in ReadLines( token ) )
+                foreach (string line in ReadLines(token))
                 {
                     token.ThrowIfCancellationRequested();
-                    Logger?.LogDebug( line );
-                    data.Add( line );
+                    LoggerHelper.Debug(line);
+                    data.Add(line);
 
                     Match match;
 
-                    if ( !( match = Regex.Match( line, "^(?<statusCode>[0-9]{3}) (?<message>.*)$" ) ).Success )
+                    if (!(match = Regex.Match(line, "^(?<statusCode>[0-9]{3}) (?<message>.*)$")).Success)
                         continue;
-                    Logger?.LogTrace( "Finished receiving message" );
-                    response.FtpStatusCode = match.Groups[ "statusCode" ].Value.ToStatusCode();
-                    response.ResponseMessage = match.Groups[ "message" ].Value;
+                    LoggerHelper.Trace("Finished receiving message");
+                    response.FtpStatusCode = match.Groups["statusCode"].Value.ToStatusCode();
+                    response.ResponseMessage = match.Groups["message"].Value;
                     break;
                 }
                 response.Data = data.ToArray();
@@ -286,38 +301,41 @@
             }
         }
 
-        public async Task<Stream> OpenDataStreamAsync( string host, int port, CancellationToken token )
+        public async Task<Stream> OpenDataStreamAsync(string host, int port, CancellationToken token)
         {
-            Logger?.LogDebug( "[FtpSocketStream] Opening datastream" );
-            var socketStream = new FtpControlStream( Configuration, dnsResolver ) { Logger = Logger, IsDataConnection = true };
-            await socketStream.ConnectStreamAsync( host, port, token );
+            LoggerHelper.Debug("[FtpSocketStream] Opening datastream");
+            var socketStream = new FtpControlStream(Configuration, dnsResolver) { IsDataConnection = true };
+            await socketStream.ConnectStreamAsync(host, port, token);
 
-            if ( IsEncrypted )
+            if (IsEncrypted)
             {
                 await socketStream.ActivateEncryptionAsync();
             }
             return socketStream;
         }
 
-        protected async Task ConnectStreamAsync( CancellationToken token )
+        protected async Task ConnectStreamAsync(CancellationToken token)
         {
-            await ConnectStreamAsync( Configuration.Host, Configuration.Port, token );
+            await ConnectStreamAsync(Configuration.Host, Configuration.Port, token);
         }
-
-        protected async Task ConnectStreamAsync( string host, int port, CancellationToken token )
+        protected async Task ConnectStreamAsync(string host, int port, CancellationToken token)
         {
             try
             {
-                await semaphore.WaitAsync( token );
-                Logger?.LogDebug( $"Connecting stream on {host}:{port}" );
-                Socket = await ConnectSocketAsync( host, port, token );
+#if NET40
+                await Task.Factory.StartNew(() =>semaphore.Wait(token));
+#else
+                await semaphore.WaitAsync(token);
+#endif
+                LoggerHelper.Debug($"Connecting stream on {host}:{port}");
+                Socket = await ConnectSocketAsync(host, port, token);
 
-                BaseStream = new NetworkStream( Socket );
+                BaseStream = new NetworkStream(Socket);
                 LastActivity = DateTime.Now;
 
-                if ( IsDataConnection )
+                if (IsDataConnection)
                 {
-                    if ( Configuration.ShouldEncrypt && Configuration.EncryptionType == FtpEncryption.Explicit )
+                    if (Configuration.ShouldEncrypt && Configuration.EncryptionType == FtpEncryption.Explicit)
                     {
                         await ActivateEncryptionAsync();
                     }
@@ -326,22 +344,26 @@
                 }
                 else
                 {
-                    if ( Configuration.ShouldEncrypt && Configuration.EncryptionType == FtpEncryption.Implicit )
+                    if (Configuration.ShouldEncrypt && Configuration.EncryptionType == FtpEncryption.Implicit)
                     {
                         await ActivateEncryptionAsync();
                     }
                 }
 
-                Logger?.LogDebug( "Waiting for welcome message" );
+                LoggerHelper.Debug("Waiting for welcome message");
 
-                while ( true )
+                while (true)
                 {
-                    if ( SocketDataAvailable() )
+                    if (SocketDataAvailable())
                     {
-                        await GetResponseAsync( token );
+                        await GetResponseAsync(token);
                         return;
                     }
-                    await Task.Delay( 10, token );
+#if NET40
+                    await Task.Factory.StartNew(() => Thread.Sleep(10), token);
+#else
+                    await Task.Delay(10, token);
+#endif
                 }
             }
             finally
@@ -350,49 +372,85 @@
             }
         }
 
-
-        protected async Task<Socket> ConnectSocketAsync( string host, int port, CancellationToken token )
+        protected async Task<Socket> ConnectSocketAsync(string host, int port, CancellationToken token)
         {
             try
             {
-                Logger?.LogDebug( "Connecting" );
-                var ipEndpoint = await dnsResolver.ResolveAsync( host, port, Configuration.IpVersion, token );
+                LoggerHelper.Debug("Connecting");
+                var ipEndpoint = await dnsResolver.ResolveAsync(host, port, Configuration.IpVersion, token);
 
-                var socket = new Socket( AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp )
+                var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp)
                 {
                     ReceiveTimeout = Configuration.TimeoutSeconds * 1000
                 };
-//                socket.SetSocketOption( SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true );
-//                socket.SetSocketOption( SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true );
-                socket.Connect( ipEndpoint );
-                socket.LingerState = new LingerOption( true, 0 );
+                //                socket.SetSocketOption( SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true );
+                //                socket.SetSocketOption( SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true );
+                socket.Connect(ipEndpoint);
+                socket.LingerState = new LingerOption(true, 0);
                 return socket;
             }
-            catch ( Exception exception )
+            catch (Exception exception)
             {
-                Logger?.LogError( $"Could not to connect socket {host}:{port} - {exception.Message}", exception );
+                LoggerHelper.Error($"Could not to connect socket {host}:{port} - {exception.Message} :{exception.ToString()}");
+                throw;
+            }
+        }
+        public async Task<Stream> AcceptDataStreamAsync(System.Net.Sockets.TcpListener listener)
+        {
+            var socketStream = new FtpControlStream(Configuration, dnsResolver) { IsDataConnection = true };
+            return await socketStream.AcceptStreamAsync(listener);
+        }
+        protected async Task<Stream> AcceptStreamAsync(System.Net.Sockets.TcpListener listener)
+        {
+            try
+            {
+                LoggerHelper.Debug($"Accept stream on {listener.LocalEndpoint.ToString()}");
+                Socket = await listener.AcceptSocketAsync();
+
+                BaseStream = new NetworkStream(Socket);
+                LastActivity = DateTime.Now;
+
+                if (IsDataConnection)
+                {
+                    if (Configuration.ShouldEncrypt && Configuration.EncryptionType == FtpEncryption.Explicit)
+                    {
+                        await ActivateEncryptionServerAsync();
+                    }
+                }
+                else
+                {
+                    if (Configuration.ShouldEncrypt && Configuration.EncryptionType == FtpEncryption.Implicit)
+                    {
+                        await ActivateEncryptionServerAsync();
+                    }
+                }
+                return this;
+            }
+            catch (Exception exception)
+            {
+                LoggerHelper.Error($"Could accept connect {listener.LocalEndpoint.ToString()} :{exception.ToString()}");
                 throw;
             }
         }
 
-        protected async Task EncryptImplicitly( CancellationToken token )
+        protected async Task EncryptImplicitly(CancellationToken token)
         {
-            Logger?.LogDebug( "Encrypting implicitly" );
+            LoggerHelper.Debug("Encrypting implicitly");
             await ActivateEncryptionAsync();
 
-            var response = await GetResponseAsync( token );
-            if ( !response.IsSuccess )
+            var response = await GetResponseAsync(token);
+            if (!response.IsSuccess)
             {
-                throw new IOException( $"Could not securely connect to host {Configuration.Host}:{Configuration.Port}" );
+                throw new IOException($"Could not securely connect to host {Configuration.Host}:{Configuration.Port}");
             }
         }
 
-        protected async Task EncryptExplicitly( CancellationToken token )
+        protected async Task EncryptExplicitly(CancellationToken token)
         {
-            Logger?.LogDebug( "Encrypting explicitly" );
-            var response = await SendCommandAsync( "AUTH TLS", token );
+            LoggerHelper.Debug("Encrypting explicitly");
+            var response = await SendCommandAsync("AUTH TLS", token);
 
-            if ( !response.IsSuccess )
+            if (!response.IsSuccess)
                 throw new InvalidOperationException();
 
             await ActivateEncryptionAsync();
@@ -400,30 +458,61 @@
 
         protected async Task ActivateEncryptionAsync()
         {
-            if ( !IsConnected )
-                throw new InvalidOperationException( "The FtpSocketStream object is not connected." );
+            if (!IsConnected)
+                throw new InvalidOperationException("The FtpSocketStream object is not connected.");
 
-            if ( BaseStream == null )
-                throw new InvalidOperationException( "The base network stream is null." );
+            if (BaseStream == null)
+                throw new InvalidOperationException("The base network stream is null.");
 
-            if ( IsEncrypted )
+            if (IsEncrypted)
                 return;
 
             try
             {
-                SslStream = new SslStream( BaseStream, true, ( sender, certificate, chain, sslPolicyErrors ) => OnValidateCertificate( certificate, chain, sslPolicyErrors ) );
-                await SslStream.AuthenticateAsClientAsync( Configuration.Host, Configuration.ClientCertificates, Configuration.SslProtocols, true );
+                SslStream = new SslStream(BaseStream, true, (sender, certificate, chain, sslPolicyErrors) => OnValidateCertificate(certificate, chain, sslPolicyErrors));
+#if NET40
+                await SslStream.AuthenticateAsClientAsync(Configuration.Host);
+#else
+                await SslStream.AuthenticateAsClientAsync(Configuration.Host, Configuration.ClientCertificates, Configuration.SslProtocols, true);
+#endif
             }
-            catch ( AuthenticationException e )
+            catch (AuthenticationException e)
             {
-                Logger?.LogError( $"Could not activate encryption for the connection: {e.Message}" );
+                LoggerHelper.Error($"Could not activate encryption for the connection: {e.Message}");
+                throw;
+            }
+        }
+        protected async Task ActivateEncryptionServerAsync()
+        {
+            if (!IsConnected)
+                throw new InvalidOperationException("The FtpSocketStream object is not connected.");
+
+            if (BaseStream == null)
+                throw new InvalidOperationException("The base network stream is null.");
+
+            if (IsEncrypted)
+                return;
+
+            try
+            {
+                SslStream = new SslStream(BaseStream, true, (sender, certificate, chain, sslPolicyErrors) => OnValidateCertificate(certificate, chain, sslPolicyErrors));
+#if NET40
+                await SslStream.AuthenticateAsServerAsync(Configuration.ClientCertificates[0]);
+#else
+                await SslStream.AuthenticateAsServerAsync(Configuration.ClientCertificates[0], true, Configuration.SslProtocols, true);
+#endif
+            }
+            catch (AuthenticationException e)
+            {
+                LoggerHelper.Error($"Could not activate encryption for the connection: {e.Message}");
                 throw;
             }
         }
 
-        private bool OnValidateCertificate( X509Certificate certificate, X509Chain chain, SslPolicyErrors errors )
+
+        private bool OnValidateCertificate(X509Certificate certificate, X509Chain chain, SslPolicyErrors errors)
         {
-            if ( Configuration.IgnoreCertificateErrors )
+            if (Configuration.IgnoreCertificateErrors)
                 return true;
 
             return errors == SslPolicyErrors.None;
@@ -431,16 +520,16 @@
 
         public void Disconnect()
         {
-            Logger?.LogTrace( "Disconnecting" );
+            LoggerHelper.Trace("Disconnecting");
             try
             {
                 BaseStream?.Dispose();
                 SslStream?.Dispose();
-                Socket?.Shutdown( SocketShutdown.Both );
+                Socket?.Shutdown(SocketShutdown.Both);
             }
-            catch ( Exception exception )
+            catch (Exception exception)
             {
-                Logger?.LogError( $"Exception caught: {exception}" );
+                LoggerHelper.Error($"Exception caught: {exception}");
             }
             finally
             {
@@ -449,15 +538,15 @@
             }
         }
 
-        protected override void Dispose( bool disposing )
+        protected override void Dispose(bool disposing)
         {
-            Logger?.LogTrace( IsDataConnection ? "Disposing of data connection" : "Disposing of control connection" );
+            LoggerHelper.Trace(IsDataConnection ? "Disposing of data connection" : "Disposing of control connection");
 
-            if ( disposing )
+            if (disposing)
             {
                 Disconnect();
             }
-            base.Dispose( disposing );
+            base.Dispose(disposing);
         }
     }
 }

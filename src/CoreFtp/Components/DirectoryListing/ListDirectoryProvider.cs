@@ -6,23 +6,21 @@
     using Enum;
     using Infrastructure;
     using System.Linq;
-    using Microsoft.Extensions.Logging;
     using Parser;
 
     internal class ListDirectoryProvider : DirectoryProviderBase
     {
         private readonly List<IListDirectoryParser> directoryParsers;
 
-        public ListDirectoryProvider( FtpClient ftpClient, ILogger logger, FtpClientConfiguration configuration )
+        public ListDirectoryProvider( FtpClient ftpClient, FtpClientConfiguration configuration )
         {
             this.ftpClient = ftpClient;
-            this.logger = logger;
             this.configuration = configuration;
 
             directoryParsers = new List<IListDirectoryParser>
             {
-                new UnixDirectoryParser( logger ),
-                new DosDirectoryParser( logger ),
+                new UnixDirectoryParser(),
+                new DosDirectoryParser(),
             };
         }
 
@@ -32,11 +30,15 @@
                 throw new FtpException( "User must be logged in" );
         }
 
-        public override async Task<ReadOnlyCollection<FtpNodeInformation>> ListAllAsync()
+        public override async Task<IEnumerable<FtpNodeInformation>> ListAllAsync()
         {
             try
             {
+#if NET40
+                await Task.Factory.StartNew(() => ftpClient.dataSocketSemaphore.Wait());
+#else
                 await ftpClient.dataSocketSemaphore.WaitAsync();
+#endif
                 return await ListNodesAsync();
             }
             finally
@@ -45,11 +47,15 @@
             }
         }
 
-        public override async Task<ReadOnlyCollection<FtpNodeInformation>> ListFilesAsync()
+        public override async Task<IEnumerable<FtpNodeInformation>> ListFilesAsync()
         {
             try
             {
+#if NET40
+                await Task.Factory.StartNew(() => ftpClient.dataSocketSemaphore.Wait());
+#else
                 await ftpClient.dataSocketSemaphore.WaitAsync();
+#endif
                 return await ListNodesAsync( FtpNodeType.File );
             }
             finally
@@ -58,11 +64,15 @@
             }
         }
 
-        public override async Task<ReadOnlyCollection<FtpNodeInformation>> ListDirectoriesAsync()
+        public override async Task<IEnumerable<FtpNodeInformation>> ListDirectoriesAsync()
         {
             try
             {
+#if NET40
+                await Task.Factory.StartNew(() => ftpClient.dataSocketSemaphore.Wait());
+#else
                 await ftpClient.dataSocketSemaphore.WaitAsync();
+#endif
                 return await ListNodesAsync( FtpNodeType.Directory );
             }
             finally
@@ -76,10 +86,10 @@
         /// </summary>
         /// <param name="ftpNodeType"></param>
         /// <returns></returns>
-        private async Task<ReadOnlyCollection<FtpNodeInformation>> ListNodesAsync( FtpNodeType? ftpNodeType = null )
+        private async Task<IEnumerable<FtpNodeInformation>> ListNodesAsync( FtpNodeType? ftpNodeType = null )
         {
             EnsureLoggedIn();
-            logger?.LogDebug( $"[ListDirectoryProvider] Listing {ftpNodeType}" );
+            LoggerHelper.Debug( $"[ListDirectoryProvider] Listing {ftpNodeType}" );
 
             try
             {
@@ -95,7 +105,7 @@
 
                 var directoryListing = RetrieveDirectoryListing();
 
-                var nodes = ParseLines( directoryListing.ToList().AsReadOnly() )
+                var nodes = ParseLines( directoryListing.ToList())
                     .Where( x => !ftpNodeType.HasValue || x.NodeType == ftpNodeType )
                     .ToList();
 
@@ -107,12 +117,13 @@
             }
         }
 
-        private IEnumerable<FtpNodeInformation> ParseLines( IReadOnlyList<string> lines )
+        private IEnumerable<FtpNodeInformation> ParseLines(IEnumerable<string> lines )
         {
             if ( !lines.Any() )
                 yield break;
 
-            var parser = directoryParsers.FirstOrDefault( x => x.Test( lines[ 0 ] ) );
+            var parser = directoryParsers.FirstOrDefault(x => x.Test(lines.First()));
+            //var parser = directoryParsers.FirstOrDefault(x => x.Test(lines[0]));
 
             if ( parser == null )
                 yield break;
